@@ -52,6 +52,7 @@ class NTU_Data():
 
         action_class = int(file_name[file_name.find('A') + 1:file_name.find('A') + 4])
         self.y = torch.tensor(action_class, dtype=torch.long)
+        self.y_true = self.y
 
         self.x = torch.zeros((3, MAX_FRAME, NUM_JOINTS, MAX_BODY_PER_FRAME), dtype=torch.float32)
 
@@ -134,7 +135,7 @@ class NTU_Dataset(InMemoryDataset):
             if self.pre_transform is not None:
                 data.x = self.pre_transform(data=data.x, modality=self.modality)
 
-            data_list.append(Data(x = data.x.unsqueeze(0), y= data.y, edge_index=EDGE_INDEX.unsqueeze(-1)))
+            data_list.append(Data(x = data.x.unsqueeze(0), y= data.y, y_true=data.y_true, edge_index=EDGE_INDEX.unsqueeze(-1)))
 
         self.save(data_list, self.processed_paths[0])
 

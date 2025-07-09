@@ -11,7 +11,8 @@ from modules.evaluator import *
 from modules.utils import *
 import torch.distributed as dist
 import torch.multiprocessing as mp
-from torch.utils.data import random_split
+from torch.utils.data import random_split, Subset
+from modules.semi.relabelling import label_unk, recreate_datasets
 from collections import OrderedDict
 import random
 import numpy as np
@@ -24,6 +25,7 @@ MODALITY = "joint"
 BENCHMARK = "xsub"
 ENABLE_PRE_TRANSFORM = False # Corresponds to --pre_transform
 NUM_EPOCHS = 75
+NUM_PHASES = 2
 BATCH_SIZE = 64
 RANDOM_SEED = 42
 
@@ -59,26 +61,47 @@ def handle_train_ddp(rank, world_size, proportion):
     if ENABLE_PRE_TRANSFORM:
         pre_transformer = NTU_Dataset.__nturgbd_pre_transformer__
 
-    dataset = NTU_Dataset(root=DATASET_PATH, 
-                          pre_filter=NTU_Dataset.__nturgbd_pre_filter__,
-                          pre_transform=pre_transformer,
-                          modality=MODALITY, 
-                          benchmark=BENCHMARK, 
-                          part="train",
-                          extended=USE_EXTENDED_DATASET
-                          )
+    total_dataset = NTU_Dataset(
+        root=DATASET_PATH, 
+        pre_filter=NTU_Dataset.__nturgbd_pre_filter__,
+        pre_transform=pre_transformer,
+        modality=MODALITY, 
+        benchmark=BENCHMARK, 
+        part="train",
+        extended=USE_EXTENDED_DATASET
+    )
 
-    # Using a proportion of the dataset
-    dataset, _ = splitting_prop(dataset, proportion=proportion)
-    print(f"Using {proportion*100:.2f}% of the dataset for training.")
-    prefix = f"supervised_{proportion*100:.0f}%"
+    true_labels = [total_dataset[i].y for i in range (len(total_dataset))]
+
+    
+    dataset, unlabeled_set = splitting_prop(total_dataset, proportion=proportion)
+
+    
+    for i in unlabeled_set.indices:
+        total_dataset.y[i] = -1
+
+    # Mélange aléatoire des indices
+    total_labeled_indices = dataset.indices 
+
+    split_point = int(len(total_labeled_indices) * 0.7)
+
+    train_set_labeled_indices = total_labeled_indices[:split_point]
+    val_set_indices = total_labeled_indices[split_point:]
+
+    train_set = Subset(total_dataset, train_set_labeled_indices)
+    val_set = Subset(total_dataset, val_set_indices)
+    protected_indices = train_set_labeled_indices 
+
+    train_set_indices = train_set_labeled_indices + unlabeled_set.indices
+    train_dataset = Subset(total_dataset, train_set_indices)
 
 
 
-    total_len = len(dataset)
-    train_len = int(0.7 * total_len)
-    val_len = total_len - train_len
-    train_set, val_set = random_split(dataset, [train_len, val_len])
+
+    print(f"Using {proportion*100:.2f}% of the dataset labeled.")
+    prefix = f"semi_supervised_{proportion*100:.0f}%"
+
+
 
     if rank == 0:
         print(f"Training model on {os.path.basename(DATASET_PATH.rstrip('/'))} dataset...")
@@ -104,12 +127,35 @@ def handle_train_ddp(rank, world_size, proportion):
                       device=device
                       )
 
-
     try:
-        start_time = time.time()
 
-        history = trainer.train(train_set, val_set, NUM_EPOCHS, prefix=prefix)
+        start_time = time.time()
+        
+        for phase in range(1,NUM_PHASES+1):
+            print(f"\nPhase {phase}/{NUM_PHASES}")
+
+            history = trainer.train(train_set, val_set, NUM_EPOCHS, prefix=prefix + f"/phase{phase}")
+
+            if rank == 0:
+                model_path = os.path.join("models", f"{prefix}_phase_{phase}.pt")
+                save_model(model_path, model, optimizer, loss_function, history, BATCH_SIZE)
+                print(f"[INFO] Model saved: {model_path}")
+
+            label_unk(model=model, 
+                      dataset=train_dataset, 
+                      phase=phase, 
+                      device=device, 
+                      protected_indices=protected_indices, 
+                      prefix=prefix, 
+                      true_labels=true_labels)
+
+            train_set, unlabeled_set = recreate_datasets(train_dataset)
+
+            print(f"Updated train dataset (phase {phase + 1}): {len(train_dataset)} samples")
+
+        
         end_time = time.time()
+
 
         if rank == 0:
             print(f"Training time {end_time - start_time:.2f} seconds", file=sys.stderr)

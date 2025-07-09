@@ -1,6 +1,6 @@
 import sys
 import torch
-from torch.utils.data import random_split
+from torch.utils.data import random_split, Subset
 
 def save_model(output_path : str, model, optimizer, loss_function, history, batch_size):
     parameters = {
@@ -29,8 +29,10 @@ def load_model(model_path : str):
     return model, optimizer, loss_function, history, batch_size
 
 def splitting_prop(dataset, proportion=0.5):
-    dataset_size = len(dataset)
-    dataset1_size = int(dataset_size * proportion)
-    dataset2_size = dataset_size - dataset1_size # Ensure all elements are covered
-    dataset1, dataset2 = random_split(dataset, [dataset1_size, dataset2_size])
+    dataset_size = torch.randperm(len(dataset)).tolist()  
+    splitpoint = int(len(dataset) * proportion)
+    dataset1_indices = dataset_size[:splitpoint]
+    dataset2_indices = dataset_size[splitpoint:]
+    dataset1 = Subset(dataset, dataset1_indices)
+    dataset2 = Subset(dataset, dataset2_indices)
     return dataset1, dataset2

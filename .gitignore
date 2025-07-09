@@ -1,0 +1,36 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+ENV/
+env/
+.venv/
+.ENV/
+
+# VSCode
+.vscode/
+
+# Logs
+*.log
+
+# Data files
+*.skeleton
+
+# Git LFS objects
+*.lfs
+*.pt
+*.zip
+*.gif
+*.pt
+
+# Torch geometric temporary/compiled files
+torch_geometric/data/.cache/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Dataset
+data/nturgb+d_skeletons/

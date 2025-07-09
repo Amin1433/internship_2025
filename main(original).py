@@ -48,6 +48,8 @@ def setup_ddp(rank, world_size):
 
 def cleanup_ddp():
     dist.destroy_process_group()
+    torch.cuda.synchronize()
+    torch.cuda.empty_cache()
 
 def handle_train_ddp(rank, world_size, args):
     setup_ddp(rank, world_size)
@@ -141,41 +143,6 @@ def handle_eval_parser(args):
     print(f"Top-1 Accuracy: {evaluation['top1_accuracy'] * 100:.2f}%")
     print(f"Top-5 Accuracy: {evaluation['top5_accuracy'] * 100:.2f}%")
 
-# --- ENSEMBLE PARSER ---
-
-def handle_ensemble_parser(args):
-    assert len(args.models) == len(args.modalities) == len(args.alphas), \
-        "Mismatch: number of models, modalities, and alphas must be equal"
-
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    models = []
-    datasets = []
-    for model_path, modality in zip(args.models, args.modalities):
-        
-        # Load model
-        model = ms_aagcn().to(device)
-        model_sd, _, _, _, batch_size = load_model(model_path)
-        cleaned_sd = OrderedDict((k.replace("module.", ""), v) for k, v in model_sd.items())
-        model.load_state_dict(cleaned_sd, strict=False)
-        models.append(model)
-
-        # Load dataset (modality-aware)
-        ds = NTU_Dataset(root=args.datasets,
-                         pre_filter=NTU_Dataset.__nturgbd_pre_filter__,
-                         pre_transform=NTU_Dataset.__nturgbd_pre_transformer__,
-                         modality=modality,
-                         benchmark=args.benchmark,
-                         part="eval",
-                         extended=args.extended)
-        datasets.append(ds)
-
-    # Use shared batch_size (assumes same for all models)
-    evaluator = EnsembleEvaluator(models=models, datasets=datasets, alphas=args.alphas, batch_size=batch_size)
-    evaluation = evaluator.evaluate(display=args.display)
-
-    print(f"Top-1 Accuracy: {evaluation['top1_accuracy'] * 100:.2f}%")
-    print(f"Top-5 Accuracy: {evaluation['top5_accuracy'] * 100:.2f}%")
 
 # ==================== CLI Interface ====================
 
@@ -224,18 +191,6 @@ if __name__ == "__main__":
     eval_parser.add_argument("--display", action="store_true", help="Display predictions")
 
     eval_parser.set_defaults(func=handle_eval_parser)
-
-    # --- Ensemble Mode ---
-    ensemble_parser = mode_parser.add_parser("ensemble", help="Evaluate an ensemble of models")
-
-    ensemble_parser.add_argument("--models", nargs='+', required=True, help="Paths to model files")
-    ensemble_parser.add_argument("--datasets", type=str, default="data/nturgb+d_skeletons/", help="Paths to corresponding datasets")
-    ensemble_parser.add_argument("--extended", action="store_true", help="use NTU RGB+D 120 dataset")
-    ensemble_parser.add_argument("--modalities", nargs='+', required=True, help="Modalities per dataset (joint, bone, etc.)")
-    ensemble_parser.add_argument("--alphas", nargs='+', type=float, required=True, help="Weight per model")
-    ensemble_parser.add_argument("--benchmark", default="xsub", choices=["xsub", "xview", "xsetup"], help="benchmark: xsub | xview | xsetup")
-    ensemble_parser.add_argument("--display", action="store_true", help="Show predictions vs ground truth")
-    ensemble_parser.set_defaults(func=handle_ensemble_parser)
 
     # --- CLI Interface ---
 

@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import torch_geometric_temporal as tgp
 from data_generator.ntu_data import EDGE_INDEX
+from tqdm import tqdm
 
 
 def bn_init(bn, scale):
@@ -20,14 +21,14 @@ class ms_aagcn(nn.Module):
 
         self.l1 = tgp.tsagcn.AAGCN(in_channels=3, out_channels=64, edge_index=EDGE_INDEX, num_nodes=num_joint, residual=False, adaptive=adaptive, attention=attention)
         self.l2 = tgp.tsagcn.AAGCN(in_channels=64, out_channels=64, edge_index=EDGE_INDEX, num_nodes=num_joint, adaptive=adaptive, attention=attention)
-        self.l3 = tgp.tsagcn.AAGCN(in_channels=64, out_channels=64, edge_index=EDGE_INDEX, num_nodes=num_joint, adaptive=adaptive, attention=attention)
-        self.l4 = tgp.tsagcn.AAGCN(in_channels=64, out_channels=64, edge_index=EDGE_INDEX, num_nodes=num_joint, adaptive=adaptive, attention=attention)
+        # self.l3 = tgp.tsagcn.AAGCN(in_channels=64, out_channels=64, edge_index=EDGE_INDEX, num_nodes=num_joint, adaptive=adaptive, attention=attention)
+        # self.l4 = tgp.tsagcn.AAGCN(in_channels=64, out_channels=64, edge_index=EDGE_INDEX, num_nodes=num_joint, adaptive=adaptive, attention=attention)
         self.l5 = tgp.tsagcn.AAGCN(in_channels=64, out_channels=128, edge_index=EDGE_INDEX, num_nodes=num_joint, stride=2, adaptive=adaptive, attention=attention)
-        self.l6 = tgp.tsagcn.AAGCN(in_channels=128, out_channels=128, edge_index=EDGE_INDEX, num_nodes=num_joint, adaptive=adaptive, attention=attention)
-        self.l7 = tgp.tsagcn.AAGCN(in_channels=128, out_channels=128, edge_index=EDGE_INDEX, num_nodes=num_joint, adaptive=adaptive, attention=attention)
+        # self.l6 = tgp.tsagcn.AAGCN(in_channels=128, out_channels=128, edge_index=EDGE_INDEX, num_nodes=num_joint, adaptive=adaptive, attention=attention)
+        # self.l7 = tgp.tsagcn.AAGCN(in_channels=128, out_channels=128, edge_index=EDGE_INDEX, num_nodes=num_joint, adaptive=adaptive, attention=attention)
         self.l8 = tgp.tsagcn.AAGCN(in_channels=128, out_channels=256, edge_index=EDGE_INDEX, num_nodes=num_joint, stride=2, adaptive=adaptive, attention=attention)
-        self.l9 = tgp.tsagcn.AAGCN(in_channels=256, out_channels=256, edge_index=EDGE_INDEX, num_nodes=num_joint, adaptive=adaptive, attention=attention)
-        self.l10 = tgp.tsagcn.AAGCN(in_channels=256, out_channels=256, edge_index=EDGE_INDEX, num_nodes=num_joint, adaptive=adaptive, attention=attention)
+        # self.l9 = tgp.tsagcn.AAGCN(in_channels=256, out_channels=256, edge_index=EDGE_INDEX, num_nodes=num_joint, adaptive=adaptive, attention=attention)
+        # self.l10 = tgp.tsagcn.AAGCN(in_channels=256, out_channels=256, edge_index=EDGE_INDEX, num_nodes=num_joint, adaptive=adaptive, attention=attention)
 
         # Apply re parameterization
         # self.fc_mu = nn.Linear(256, latent_dim)  # Mean of latent space
@@ -53,14 +54,14 @@ class ms_aagcn(nn.Module):
 
         x = self.l1(x)
         x = self.l2(x)
-        x = self.l3(x)
-        x = self.l4(x)
+        # x = self.l3(x)
+        # x = self.l4(x)
         x = self.l5(x)
-        x = self.l6(x)
-        x = self.l7(x)
+        # x = self.l6(x)
+        # x = self.l7(x)
         x = self.l8(x)
-        x = self.l9(x)
-        x = self.l10(x)
+        # x = self.l9(x)
+        # x = self.l10(x)
 
         # N*M,C,T,V
         c_new = x.size(1)
@@ -94,4 +95,47 @@ class ms_aagcn(nn.Module):
         kl_loss = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
 
         return kl_loss
+    
+    def forward_features(self, x):
+        # Même preprocessing que dans forward
+        N, C, T, V, M = x.size()
+
+        x = x.permute(0, 4, 3, 1, 2).contiguous().view(N, M * V * C, T)
+        x = self.data_bn(x)
+        x = x.view(N, M, V, C, T).permute(0, 1, 3, 4, 2).contiguous().view(N * M, C, T, V)
+
+        # Passage dans les blocs AAGCN (même que forward, mais sans fc)
+        x = self.l1(x)
+        x = self.l2(x)
+        x = self.l5(x)
+        x = self.l8(x)
+
+        # Agrégation spatio-temporelle
+        c_new = x.size(1)
+        x = x.view(N, M, c_new, -1)
+        x = x.mean(3).mean(1)
+        x = self.drop_out(x)
+
+        return x
+    
+
+
+def extract_features(pre_model, dataset, device):
+    pre_model.eval()
+    feature_dict = {}
+
+    with torch.no_grad():
+        for i, data in tqdm(enumerate(dataset), total=len(dataset), desc="Extracting features"):
+            x = data.x.to(device) if hasattr(data, 'x') else data[0].to(device)
+
+            if hasattr(pre_model, "module"):
+                feats = pre_model.module.forward_features(x)
+            else:
+                feats = pre_model.forward_features(x)
+
+            feature_dict[i] = feats.squeeze(0).cpu()
+
+    return feature_dict
+    
+    
 

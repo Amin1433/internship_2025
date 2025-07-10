@@ -2,12 +2,43 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 
+def concat_phase_arrays(log_dir):
+    """
+    Si le dossier commence par 'semi_supervised', concatène les .npy des sous-dossiers phase1, phase2, etc.
+    Enregistre les arrays concaténés dans log_dir (parent des phases).
+    """
+    if not os.path.basename(log_dir).startswith("semi_supervised"):
+        return
+
+    arrays = {"train_loss": [], "val_loss": [], "train_acc": [], "val_acc": []}
+    # Liste des sous-dossiers phase1, phase2, ...
+    phases = sorted([d for d in os.listdir(log_dir) if d.startswith("phase") and os.path.isdir(os.path.join(log_dir, d))])
+
+    for phase in phases:
+        phase_dir = os.path.join(log_dir, phase)
+        for key in arrays.keys():
+            npy_path = os.path.join(phase_dir, f"{key}.npy")
+            if os.path.exists(npy_path):
+                arrays[key].append(np.load(npy_path))
+            else:
+                print(f"Warning: {npy_path} not found, skipping.")
+
+    # Concatène chaque liste si non vide, sinon None, puis sauvegarde dans log_dir
+    for key in arrays:
+        if arrays[key]:
+            concat_arr = np.concatenate(arrays[key])
+            out_path = os.path.join(log_dir, f"{key}.npy")
+            np.save(out_path, concat_arr)
+            print(f"Saved concatenated {key} to {out_path}")
+        else:
+            print(f"Warning: No arrays found for {key} in {log_dir}, nothing saved.")
+
 def plot_metrics(log_dir, output_dir):
     """
     Plots training and validation loss and accuracy from .npy files
     and saves them as PNG images.
+    Ne plot que les arrays présents directement dans log_dir.
     """
-    
     train_loss_path = os.path.join(log_dir, "train_loss.npy")
     val_loss_path = os.path.join(log_dir, "val_loss.npy")
     train_acc_path = os.path.join(log_dir, "train_acc.npy")
@@ -66,6 +97,11 @@ def main():
         current_log_dir = os.path.join(log_base_dir, subdir_name)
 
         if os.path.isdir(current_log_dir):
+            # Si semi_supervised, concatène d'abord les phases et sauvegarde dans current_log_dir
+            if subdir_name.startswith("semi_supervised"):
+                print(f"Concatenating phases in: {current_log_dir}")
+                concat_phase_arrays(current_log_dir)
+
             output_subdir = os.path.join(graphs_base_dir, subdir_name)
             os.makedirs(output_subdir, exist_ok=True)
             print(f"Processing directory: {current_log_dir}")

@@ -6,12 +6,14 @@ from tqdm import tqdm
 def label_unk(model, dataset: Subset, phase: int, device, protected_indices, prefix=None, true_labels=[]):
     model.eval()
 
-    threshold = 1 - 0.0005 * 0.30
-    margin_min = 0.995
+    # threshold = 1 - 0.0005 * 0.30
+    # margin_min = 0.995
+    threshold = 0.95
+    margin_min = 0.5  
 
     unlabelling = True
 
-    indices = dataset.indices
+    indices = [i for i in dataset.indices if i not in protected_indices]
     dataset_base = dataset.dataset
 
     newly_labelled_count = 0
@@ -22,6 +24,7 @@ def label_unk(model, dataset: Subset, phase: int, device, protected_indices, pre
 
     total_labeled_count = 0
     total_labeled_correct = 0
+    
 
     for i in tqdm(indices, desc=f"[Phase {phase}] Relabelling"):
         data_sample = dataset_base[i]
@@ -43,11 +46,16 @@ def label_unk(model, dataset: Subset, phase: int, device, protected_indices, pre
         pred_class = top2.indices[0].item()
 
         if data_sample.y == -1 and confidence > threshold and margin > margin_min and i not in protected_indices:
-            data_sample.y = int(pred_class)
+            dataset_base.y[i] = int(pred_class)
             newly_labelled_count += 1
             if data_sample.y == true_labels[i]:
                 newly_labelled_correct += 1
-
+            
+            # log_dir = os.path.join(".", "logs", prefix)
+            # os.makedirs(log_dir, exist_ok=True)
+            # with open(os.path.join(log_dir, "labelling.txt"), "a") as f:
+            #     f.write(f"i={i}, pred={data_sample.y}, pred2={dataset_base.y[i]}, true={true_labels[i]}, match={int(pred_class)==int(true_labels[i])}\n")
+            
         if unlabelling and confidence < threshold and margin < margin_min and i not in protected_indices and data_sample.y != -1:
             if data_sample.y == true_labels[i]:
                 unlabeled_correct += 1
@@ -62,11 +70,15 @@ def label_unk(model, dataset: Subset, phase: int, device, protected_indices, pre
                 if data_sample.y == true_labels[i]:
                     total_labeled_correct += 1
 
+    acc_newly = newly_labelled_correct / newly_labelled_count if newly_labelled_count != 0 else 0
+    acc_unlabeled = (unlabeled_count - unlabeled_correct) / unlabeled_count if unlabeled_count != 0 else 0
+    acc_total = total_labeled_correct / total_labeled_count if total_labeled_count != 0 else 0
+
     text = (
         f"       Phase {phase}\n"
-        f"newly labelled {newly_labelled_correct}/{newly_labelled_count} correct\n"
-        f"unlabeled {unlabeled_correct}/{unlabeled_count} correct\n"
-        f"total labeled data {total_labeled_correct}/{total_labeled_count} correct\n\n"
+        f"newly labelled: {acc_newly*100:.2f}% ({newly_labelled_correct}/{newly_labelled_count} correct)\n"
+        f"unlabeled: {acc_unlabeled*100:.2f}% ({unlabeled_correct}/{unlabeled_count} correct)\n"
+        f"total labeled data: {acc_total*100:.2f}% ({total_labeled_correct}/{total_labeled_count} correct)\n\n"
     )
 
     log_dir = os.path.join(".", "logs", prefix)

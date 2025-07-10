@@ -1,0 +1,76 @@
+
+                    threshold = 0.95            margin_min = 0.8 
+       Phase 1
+percentage of labeled data from the initial unlabeled set: 6.05%
+newly labelled: 97.98% (2138/2182 correct)
+unlabeled: 0.00% (0/0 correctly unlabeled)
+total labeled data: 97.98% (2138/2182 correct)
+
+       Phase 2
+percentage of labeled data from the initial unlabeled set: 13.79%
+newly labelled: 84.04% (2348/2794 correct)
+unlabeled: 2.63% (3/114 correctly unlabeled)
+total labeled data: 90.15% (4486/4976 correct)
+
+
+                    threshold = 0.995            margin_min = 0.8
+
+       Phase 1
+percentage of labeled data from the initial unlabeled set: 1.06%
+newly labelled: 99.21% (379/382 correct)
+unlabeled: 0.00% (0/0 correctly unlabeled)
+total labeled data: 99.21% (379/382 correct)
+
+                     threshold = 0.95            margin_min = 0.9
+       Phase 1
+percentage of labeled data from the initial unlabeled set: 6.05%
+newly labelled: 97.98% (2138/2182 correct)
+unlabeled: 0.00% (0/0 correctly unlabeled)
+total labeled data: 97.98% (2138/2182 correct)
+
+                     threshold = 0.95            margin_min = 0.95
+       Phase 1
+percentage of labeled data from the initial unlabeled set: 4.60%
+newly labelled: 98.56% (1637/1661 correct)
+unlabeled: 0.00% (0/0 correctly unlabeled)
+total labeled data: 98.56% (1637/1661 correct)
+
+
+                     threshold = 0.99            margin_min = 0.99
+
+       Phase 1
+percentage of labeled data from the initial unlabeled set: 1.35%
+newly labelled: 99.18% (482/486 correct)
+unlabeled: 0.00% (0/0 correctly unlabeled)
+total labeled data: 99.18% (482/486 correct)
+
+                     threshold = 0.999           margin_min = 0.999
+       Phase 1
+percentage of labeled data from the initial unlabeled set: 0.14%
+newly labelled: 97.96% (48/49 correct)
+unlabeled: 0.00% (0/0 correctly unlabeled)
+total labeled data: 97.96% (48/49 correct)
+
+                     threshold = 0.9995           margin_min = 0.9995
+
+       Phase 1
+percentage of labeled data from the initial unlabeled set: 0.07%
+newly labelled: 100.00% (24/24 correct)
+unlabeled: 0.00% (0/0 correctly unlabeled)
+total labeled data: 100.00% (24/24 correct)
+
+                     threshold = 0.9993           margin_min = 0.9993
+       Phase 1
+percentage of labeled data from the initial unlabeled set: 0.09%
+newly labelled: 100.00% (32/32 correct)
+unlabeled: 0.00% (0/0 correctly unlabeled)
+total labeled data: 100.00% (32/32 correct)
+
+                     threshold = 0.9991           margin_min = 0.9991
+
+       Phase 1
+percentage of labeled data from the initial unlabeled set: 0.12%
+newly labelled: 97.67% (42/43 correct)
+unlabeled: 0.00% (0/0 correctly unlabeled)
+total labeled data: 97.67% (42/43 correct)
+

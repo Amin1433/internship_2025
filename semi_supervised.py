@@ -12,6 +12,8 @@ from modules.utils import *
 import torch.distributed as dist
 import torch.multiprocessing as mp
 from torch.utils.data import random_split, Subset
+# from modules.semi.ralabelling_batch import label_unk, recreate_datasets
+# from modules.semi.relabelling_testing import label_unk, recreate_datasets
 from modules.semi.relabelling import label_unk, recreate_datasets
 from collections import OrderedDict
 import random
@@ -24,11 +26,12 @@ USE_EXTENDED_DATASET = False # Corresponds to --extended
 MODALITY = "joint"
 BENCHMARK = "xsub"
 ENABLE_PRE_TRANSFORM = False # Corresponds to --pre_transform
-NUM_EPOCHS = 100
-NUM_PHASES = 2
+NUM_EPOCHS = 65
+NUM_PHASES = 3
 BATCH_SIZE = 64
 RANDOM_SEED = 42
 LOADING_PRETRAINED = True # Whether to load a pretrained model for semi-supervised training
+
 
 def set_seed(seed):
     random.seed(seed)
@@ -172,7 +175,7 @@ def handle_train_ddp(rank, world_size, proportion):
 
             train_set, unlabeled_set = recreate_datasets(train_dataset)
 
-            print(f"Updated train dataset (phase {starting_phase}): {len(train_dataset)} samples")
+            print(f"Updated train dataset (phase {1}): {len(train_set)} labeled samples, {len(unlabeled_set)} unlabeled samples, {len(train_dataset)} total samples")
 
         for phase in range(starting_phase,NUM_PHASES+1):
             print(f"\nPhase {phase}/{NUM_PHASES}")

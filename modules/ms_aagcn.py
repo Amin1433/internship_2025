@@ -95,22 +95,24 @@ class ms_aagcn(nn.Module):
         kl_loss = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
 
         return kl_loss
-    
+
+
+    #MIL Part
     def forward_features(self, x):
-        # Même preprocessing que dans forward
+        
         N, C, T, V, M = x.size()
 
         x = x.permute(0, 4, 3, 1, 2).contiguous().view(N, M * V * C, T)
         x = self.data_bn(x)
         x = x.view(N, M, V, C, T).permute(0, 1, 3, 4, 2).contiguous().view(N * M, C, T, V)
 
-        # Passage dans les blocs AAGCN (même que forward, mais sans fc)
+        
         x = self.l1(x)
         x = self.l2(x)
         x = self.l5(x)
         x = self.l8(x)
 
-        # Agrégation spatio-temporelle
+        
         c_new = x.size(1)
         x = x.view(N, M, c_new, -1)
         x = x.mean(3).mean(1)
@@ -119,7 +121,7 @@ class ms_aagcn(nn.Module):
         return x
     
 
-
+# MIL Part
 def extract_features(pre_model, dataset, device):
     pre_model.eval()
     feature_dict = {}

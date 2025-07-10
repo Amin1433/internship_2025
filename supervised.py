@@ -11,7 +11,7 @@ from modules.evaluator import *
 from modules.utils import *
 import torch.distributed as dist
 import torch.multiprocessing as mp
-from torch.utils.data import random_split
+from torch.utils.data import random_split, Subset
 from collections import OrderedDict
 import random
 import numpy as np
@@ -75,10 +75,12 @@ def handle_train_ddp(rank, world_size, proportion):
 
 
 
-    total_len = len(dataset)
-    train_len = int(0.7 * total_len)
-    val_len = total_len - train_len
-    train_set, val_set = random_split(dataset, [train_len, val_len])
+    total_labeled_indices = dataset.indices 
+    split_point = int(len(total_labeled_indices) * 0.7)
+    train_set_labeled_indices = total_labeled_indices[:split_point]
+    val_set_indices = total_labeled_indices[split_point:]
+    train_set = Subset(total_dataset, train_set_labeled_indices)
+    val_set = Subset(total_dataset, val_set_indices)
 
     if rank == 0:
         print(f"Training model on {os.path.basename(DATASET_PATH.rstrip('/'))} dataset...")

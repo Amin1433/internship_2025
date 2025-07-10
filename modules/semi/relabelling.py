@@ -2,14 +2,15 @@ import torch
 from torch.utils.data import random_split, Subset
 import os
 from tqdm import tqdm
+from torch.utils.data import DataLoader
 
 def label_unk(model, dataset: Subset, phase: int, device, protected_indices, prefix=None, true_labels=[]):
     model.eval()
 
     # threshold = 1 - 0.0005 * 0.30
     # margin_min = 0.995
-    threshold = 0.95
-    margin_min = 0.5  
+    threshold = 0.99
+    margin_min = 0.99
 
     unlabelling = True
 
@@ -65,7 +66,7 @@ def label_unk(model, dataset: Subset, phase: int, device, protected_indices, pre
     for i in indices:
         if i not in protected_indices:
             data_sample = dataset_base[i]
-            if data_sample.y != -1:
+            if dataset_base.y[i] != -1:
                 total_labeled_count += 1
                 if data_sample.y == true_labels[i]:
                     total_labeled_correct += 1
@@ -76,8 +77,9 @@ def label_unk(model, dataset: Subset, phase: int, device, protected_indices, pre
 
     text = (
         f"       Phase {phase}\n"
+        f"percentage of labeled data from the initial unlabeled set: {total_labeled_count / len(indices) * 100:.2f}%\n"
         f"newly labelled: {acc_newly*100:.2f}% ({newly_labelled_correct}/{newly_labelled_count} correct)\n"
-        f"unlabeled: {acc_unlabeled*100:.2f}% ({unlabeled_correct}/{unlabeled_count} correct)\n"
+        f"unlabeled: {acc_unlabeled*100:.2f}% ({unlabeled_count-unlabeled_correct}/{unlabeled_count} correctly unlabeled)\n"
         f"total labeled data: {acc_total*100:.2f}% ({total_labeled_correct}/{total_labeled_count} correct)\n\n"
     )
 
@@ -97,3 +99,19 @@ def recreate_datasets(dataset: Subset):
     labeled_dataset = Subset(dataset_base, labeled_indices)
     unlabeled_dataset = Subset(dataset_base, unlabeled_indices)
     return labeled_dataset, unlabeled_dataset
+
+def get_outputs_by_batch(model, dataset, device, batch_size=128):
+    model.eval()
+    loader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
+    output_list = []
+    with torch.no_grad():
+        for batch in loader:
+            if hasattr(batch, 'x'):
+                x = batch.x.to(device)
+            else:
+                x = batch.to(device)
+            outputs = model(x)
+            # outputs: (batch_size, num_classes)
+            for out in outputs:
+                output_list.append(out.cpu())
+    return output_list

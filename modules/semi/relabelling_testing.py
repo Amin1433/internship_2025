@@ -1,0 +1,117 @@
+import torch
+from torch.utils.data import random_split, Subset
+import os
+from tqdm import tqdm
+from torch.utils.data import DataLoader
+import pickle
+
+def label_unk(model, dataset: Subset, phase: int, device, protected_indices, prefix=None, true_labels=[]):
+    model.eval()
+
+    # threshold = 1 - 0.0005 * 0.30
+    # margin_min = 0.995
+    threshold = 0.99
+    margin_min = threshold
+
+    unlabelling = True
+
+    indices = [i for i in dataset.indices if i not in protected_indices]
+    dataset_base = dataset.dataset
+
+    newly_labelled_count = 0
+    newly_labelled_correct = 0
+
+    unlabeled_count = 0
+    unlabeled_correct = 0
+
+    total_labeled_count = 0
+    total_labeled_correct = 0
+    
+    outputs_path = os.path.join("models", "semi", f"outputs_list_phase{phase}.pkl")
+    if os.path.exists(outputs_path):
+        with open(outputs_path, "rb") as f:
+            outputs_list = pickle.load(f)
+        print(f"Loaded outputs_list from {outputs_path}")
+    else:
+        outputs_list = []
+        with torch.no_grad():
+            for i in tqdm(indices, desc=f"[Phase {phase}] Relabelling"):
+                data_sample = dataset_base[i]
+                if hasattr(data_sample, 'x') and torch.is_tensor(data_sample.x):
+                    sample_tensor = data_sample.x.to(device)
+                elif torch.is_tensor(data_sample):
+                    sample_tensor = data_sample.to(device)
+                else:
+                    raise TypeError("Expected dataset item to be a torch.Tensor or have a .x attribute that is a tensor.")
+                outputs_list.append(model(sample_tensor).cpu())
+                torch.cuda.empty_cache()
+        os.makedirs(os.path.dirname(outputs_path), exist_ok=True)
+        with open(outputs_path, "wb") as f:
+            pickle.dump(outputs_list, f)
+        print(f"Saved outputs_list to {outputs_path}")
+
+
+    for j, i in enumerate(tqdm(indices, desc=f"[Phase {phase}] Relabelling")):
+        data_sample = dataset_base[i]
+        outputs = outputs_list[j]
+        
+        probs = torch.softmax(outputs[0], dim=0)
+        top2 = torch.topk(probs, 2)
+
+        confidence = top2.values[0].item()
+        margin = (top2.values[0] - top2.values[1]).item()
+        pred_class = top2.indices[0].item()
+
+        if data_sample.y == -1 and confidence > threshold and margin > margin_min and i not in protected_indices:
+            dataset_base.y[i] = int(pred_class)
+            newly_labelled_count += 1
+            if data_sample.y == true_labels[i]:
+                newly_labelled_correct += 1
+            
+            # log_dir = os.path.join(".", "logs", prefix)
+            # os.makedirs(log_dir, exist_ok=True)
+            # with open(os.path.join(log_dir, "labelling.txt"), "a") as f:
+            #     f.write(f"i={i}, pred={data_sample.y}, pred2={dataset_base.y[i]}, true={true_labels[i]}, match={int(pred_class)==int(true_labels[i])}\n")
+            
+        if unlabelling and confidence < threshold and margin < margin_min and i not in protected_indices and data_sample.y != -1:
+            if data_sample.y == true_labels[i]:
+                unlabeled_correct += 1
+            data_sample.y = -1
+            unlabeled_count += 1
+
+    for i in indices:
+        if i not in protected_indices:
+            data_sample = dataset_base[i]
+            if dataset_base.y[i] != -1:
+                total_labeled_count += 1
+                if data_sample.y == true_labels[i]:
+                    total_labeled_correct += 1
+
+    acc_newly = newly_labelled_correct / newly_labelled_count if newly_labelled_count != 0 else 0
+    acc_unlabeled = (unlabeled_count - unlabeled_correct) / unlabeled_count if unlabeled_count != 0 else 0
+    acc_total = total_labeled_correct / total_labeled_count if total_labeled_count != 0 else 0
+
+    text = (
+        f"       Phase {phase}\n"
+        f"percentage of labeled data from the initial unlabeled set: {total_labeled_count / len(indices) * 100:.2f}%\n"
+        f"newly labelled: {acc_newly*100:.2f}% ({newly_labelled_correct}/{newly_labelled_count} correct)\n"
+        f"unlabeled: {acc_unlabeled*100:.2f}% ({unlabeled_count-unlabeled_correct}/{unlabeled_count} correctly unlabeled)\n"
+        f"total labeled data: {acc_total*100:.2f}% ({total_labeled_correct}/{total_labeled_count} correct)\n\n"
+    )
+
+    log_dir = os.path.join(".", "logs", prefix)
+    os.makedirs(log_dir, exist_ok=True)
+
+    with open(os.path.join(log_dir, "labelling.txt"), "a") as f:
+        f.write(text)
+
+def recreate_datasets(dataset: Subset):
+    indices = dataset.indices
+    dataset_base = dataset.dataset
+
+    labeled_indices = [i for i in indices if dataset_base[i].y != -1]
+    unlabeled_indices = [i for i in indices if dataset_base[i].y == -1]
+
+    labeled_dataset = Subset(dataset_base, labeled_indices)
+    unlabeled_dataset = Subset(dataset_base, unlabeled_indices)
+    return labeled_dataset, unlabeled_dataset

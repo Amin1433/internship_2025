@@ -50,7 +50,7 @@ class Trainer:
             "val_acc": []
         }
 
-        self.best_val_loss = avg_val_loss
+        self.best_val_loss = 10
         self.epochs_without_improvement = 0
         self.best_model_state = self.model.state_dict()
         

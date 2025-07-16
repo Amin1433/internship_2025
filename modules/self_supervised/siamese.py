@@ -2,65 +2,109 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 import random
+import numpy as np
 
+# Votre fonction triplet_loss reste inchangée
 def triplet_loss(anchor_embedding, positive_embedding, negative_embedding, margin=1.0):
     distance_positive = (anchor_embedding - positive_embedding).pow(2).sum(1)
     distance_negative = (anchor_embedding - negative_embedding).pow(2).sum(1)
     losses = torch.relu(distance_positive - distance_negative + margin)
     return losses.mean()
 
-class SiameseDataset(Dataset):
-    def __init__(self, training_generators):
-        self.training_generators = training_generators
-        self.class_to_idx = {i: gen for i, gen in enumerate(training_generators)}
-        self.classes = [i for i, gen in enumerate(training_generators) if len(gen) > 0]
-        self.n_classes = len(self.classes)
+# --- Fonctions d'augmentation de données pour les squelettes ---
+# Les données de squelette sont de forme (C, T, V, M) : (Canaux, Temps, Articulations, Personnes)
 
-        self.samples_by_class_flat = []
-        for class_idx, gen in enumerate(self.training_generators):
-            for sample_in_class_idx in range(len(gen)):
-                self.samples_by_class_flat.append((class_idx, sample_in_class_idx))
+class DataAugmentations:
+    def __init__(self, spatial_noise_std=0.01, temporal_mask_ratio=0.1, spatial_mask_ratio=0.1):
+        self.spatial_noise_std = spatial_noise_std
+        self.temporal_mask_ratio = temporal_mask_ratio
+        self.spatial_mask_ratio = spatial_mask_ratio
+
+    def __call__(self, x):
+        """Applique une composition aléatoire d'augmentations à un échantillon de squelette."""
+        x_aug = x.clone()
         
-        self.non_empty_classes = [c for c in self.classes if len(self.class_to_idx[c]) > 0]
+        # Choisir aléatoirement une ou plusieurs augmentations
+        if random.random() < 0.5: # 50% de chance d'appliquer le bruit spatial
+            x_aug = self.spatial_jitter(x_aug)
+        if random.random() < 0.3: # 30% de chance d'appliquer le masquage temporel
+            x_aug = self.temporal_masking(x_aug)
+        if random.random() < 0.3: # 30% de chance d'appliquer le masquage spatial
+            x_aug = self.spatial_masking(x_aug)
+        # Ajouter d'autres augmentations ici (rotation, scaling, etc.)
+
+        return x_aug
+
+    def spatial_jitter(self, x):
+        """Ajoute un bruit aléatoire aux coordonnées des articulations."""
+        noise = torch.randn_like(x) * self.spatial_noise_std
+        return x + noise
+
+    def temporal_masking(self, x):
+        """Masque aléatoirement des segments temporels entiers (met à zéro)."""
+        T_dim = x.shape[1]
+        num_frames_to_mask = int(T_dim * self.temporal_mask_ratio)
+        if num_frames_to_mask == 0 and T_dim > 0:
+            num_frames_to_mask = 1
+
+        if num_frames_to_mask > 0:
+            start_idx = random.randint(0, T_dim - num_frames_to_mask)
+            x[:, start_idx : start_idx + num_frames_to_mask, :, :] = 0
+        return x
+
+    def spatial_masking(self, x):
+        """Masque aléatoirement des articulations entières (met à zéro)."""
+        V_dim = x.shape[2]
+        num_joints_to_mask = int(V_dim * self.spatial_mask_ratio)
+        if num_joints_to_mask == 0 and V_dim > 0:
+            num_joints_to_mask = 1
+
+        if num_joints_to_mask > 0:
+            joints_to_mask = random.sample(range(V_dim), num_joints_to_mask)
+            x[:, :, joints_to_mask, :] = 0
+        return x
+
+# --- MODIFICATION : Implémentation correcte du Dataset pour SSL ---
+class SiameseDataset(Dataset):
+    def __init__(self, dataset, augmentations=None):
+        """
+        Args:
+            dataset (torch.utils.data.Subset or torch.utils.data.Dataset): 
+                L'ensemble de données à utiliser (typiquement non labellisé).
+            augmentations (callable): Une fonction de transformation pour créer des paires positives.
+        """
+        self.dataset = dataset
+        self.augmentations = augmentations if augmentations is not None else DataAugmentations()
 
     def __getitem__(self, index):
-        anchor_class_idx = random.choice(self.non_empty_classes)
-        anchor_generator = self.class_to_idx[anchor_class_idx]
-        anchor_sample_idx = random.randint(0, len(anchor_generator) - 1)
-        anchor_data = anchor_generator[anchor_sample_idx][0]
+        # Anchor: L'échantillon original.
+        # On suppose que le dataset renvoie un objet avec un attribut .x
+        anchor_data = self.dataset[index].x 
 
-        positive_class_idx = anchor_class_idx
-        positive_generator = self.class_to_idx[positive_class_idx]
+        # Positive: Une vue augmentée de l'ancre.
+        positive_data = self.augmentations(anchor_data)
+
+        # Negative: Un échantillon complètement différent, aussi augmenté.
+        negative_index = random.randint(0, len(self.dataset) - 1)
+        while negative_index == index:
+            negative_index = random.randint(0, len(self.dataset) - 1)
         
-        if len(positive_generator) > 1:
-            positive_sample_idx = random.randint(0, len(positive_generator) - 1)
-            while positive_sample_idx == anchor_sample_idx:
-                positive_sample_idx = random.randint(0, len(positive_generator) - 1)
-        else:
-            positive_sample_idx = anchor_sample_idx
-            
-        positive_data = positive_generator[positive_sample_idx][0]
-
-        negative_class_idx = random.choice(self.non_empty_classes)
-        while negative_class_idx == anchor_class_idx:
-            negative_class_idx = random.choice(self.non_empty_classes)
+        negative_data_raw = self.dataset[negative_index].x
+        negative_data = self.augmentations(negative_data_raw) 
         
-        negative_generator = self.class_to_idx[negative_class_idx]
-        negative_sample_idx = random.randint(0, len(negative_generator) - 1)
-        negative_data = negative_generator[negative_sample_idx][0]
-
         return anchor_data, positive_data, negative_data
 
     def __len__(self):
-        total_samples = sum(len(gen) for gen in self.training_generators)
-        return total_samples if total_samples > 0 else 1
+        return len(self.dataset)
 
+# --- MODIFICATION : Simplification du DataLoader ---
 class SiameseDataLoader:
-    def __init__(self, dataset, batch_size, class_count, shuffle=True):
+    def __init__(self, dataset, batch_size, shuffle=True):
         self.dataset = dataset
         self.batch_size = batch_size
         self.shuffle = shuffle
         
+        # Le paramètre class_count est supprimé car non pertinent pour le SSL
         self.data_loader = DataLoader(self.dataset, batch_size=batch_size, shuffle=shuffle)
 
     def __iter__(self):
@@ -69,6 +113,7 @@ class SiameseDataLoader:
     def __len__(self):
         return len(self.data_loader)
 
+# Votre SiameseModel reste inchangé
 class SiameseModel(nn.Module):
     def __init__(self, tower):
         super(SiameseModel, self).__init__()
@@ -76,6 +121,8 @@ class SiameseModel(nn.Module):
 
     def forward(self, x_tuple):
         anchor_data, positive_data, negative_data = x_tuple
+        
+        # Le formatage des données reste le même
         if anchor_data.dim() == 6 and anchor_data.shape[1] == 1:
             anchor_data = anchor_data.squeeze(1)
         if positive_data.dim() == 6 and positive_data.shape[1] == 1:

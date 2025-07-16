@@ -30,6 +30,7 @@ NUM_EPOCHS = 150
 NUM_PHASES = 10
 BATCH_SIZE = 64
 RANDOM_SEED = 42
+PATIENCE = 12 # Patience for early stopping
 LOADING_PRETRAINED = True # Whether to load a pretrained model for semi-supervised training
 
 
@@ -158,7 +159,7 @@ def handle_train_ddp(rank, world_size, proportion):
                       rank=rank,
                       world_size=world_size,
                       device=device,
-                      patience=12
+                      patience=PATIENCE,
                       )
 
     try:

@@ -1,0 +1,6 @@
+        Phase 1
+percentage of labeled data from the initial unlabeled set: 18.75%
+newly labelled: 89.67% (6068/6767 correct)
+unlabeled: 0.00% (0/0 correctly unlabeled)
+total labeled data: 89.67% (6068/6767 correct)
+

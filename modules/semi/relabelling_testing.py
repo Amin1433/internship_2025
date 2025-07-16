@@ -10,8 +10,8 @@ def label_unk(model, dataset: Subset, phase: int, device, protected_indices, pre
 
     # threshold = 1 - 0.0005 * 0.30
     # margin_min = 0.995
-    threshold = 0.99
-    margin_min = threshold
+    threshold = 0.999
+    margin_min = 0.999
 
     unlabelling = True
 
@@ -63,7 +63,7 @@ def label_unk(model, dataset: Subset, phase: int, device, protected_indices, pre
         pred_class = top2.indices[0].item()
 
         if data_sample.y == -1 and confidence > threshold and margin > margin_min and i not in protected_indices:
-            dataset_base.y[i] = int(pred_class)
+            dataset_base.y[i] = int(pred_class) + 1 # Adjusting for 1-based indexing
             newly_labelled_count += 1
             if data_sample.y == true_labels[i]:
                 newly_labelled_correct += 1
@@ -76,7 +76,7 @@ def label_unk(model, dataset: Subset, phase: int, device, protected_indices, pre
         if unlabelling and confidence < threshold and margin < margin_min and i not in protected_indices and data_sample.y != -1:
             if data_sample.y == true_labels[i]:
                 unlabeled_correct += 1
-            data_sample.y = -1
+            dataset_base.y[i] = -1
             unlabeled_count += 1
 
     for i in indices:

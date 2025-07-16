@@ -42,6 +42,15 @@ class Trainer:
 
     def train(self, train_data: Dataset, val_data: Dataset, num_epoch, prefix=None):
         
+        # This ensures that each call to train() records metrics for that phase only.
+        self.history = {
+            "train_loss": [],
+            "val_loss": [],
+            "train_acc": [],
+            "val_acc": []
+        }
+        
+
         if prefix is not None and self.rank == 0: 
             os.makedirs(f"logs/{prefix}", exist_ok=True) 
 
@@ -53,8 +62,8 @@ class Trainer:
         val_data_loader = DataLoader(val_data, batch_size=self.batch_size, sampler=val_sampler,
                                      num_workers=4, pin_memory=True, prefetch_factor=2, persistent_workers=True)
 
-        self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=[30, 40], gamma=0.1)
-
+        # self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=[30, 40], gamma=0.1)
+        self.scheduler = None
         for epoch in range(num_epoch):
             train_sampler.set_epoch(epoch)
             val_sampler.set_epoch(epoch)
@@ -85,8 +94,8 @@ class Trainer:
                 break
             """
 
-            if self.scheduler:
-                self.scheduler.step()
+            # if self.scheduler:
+            #     self.scheduler.step()
 
         # Restore best model
         if self.best_model_state:

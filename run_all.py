@@ -1,12 +1,15 @@
 import subprocess
 
 commands = [
+    # "python supervised.py --proportion 0.1",
+    # "python supervised.py --proportion 0.01",
+    # "python supervised.py --proportion 0.05",
     "python semi_supervised.py --proportion 0.1",
     "python semi_supervised.py --proportion 0.01",
     "python semi_supervised.py --proportion 0.05",
-    "python weakly.py --proportion 0.1",
-    "python weakly.py --proportion 0.01",
-    "python weakly.py --proportion 0.05",
+    # "python weakly.py --proportion 0.1",
+    # "python weakly.py --proportion 0.01",
+    # "python weakly.py --proportion 0.05",
 ]
 
 for cmd in commands:

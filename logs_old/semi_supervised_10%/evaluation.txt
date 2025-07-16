@@ -1,0 +1,5 @@
+Evaluation of model: semi_supervised_10%_phase_3
+[TRAIN] Top-1 Accuracy: 60.60%
+[TRAIN] Top-5 Accuracy: 86.95%
+[EVAL] Top-1 Accuracy: 54.93%
+[EVAL] Top-5 Accuracy: 82.69%

@@ -47,7 +47,7 @@ def label_unk(model, dataset: Subset, phase: int, device, protected_indices, pre
         pred_class = top2.indices[0].item()
 
         if data_sample.y == -1 and confidence > threshold and margin > margin_min and i not in protected_indices:
-            dataset_base.y[i] = int(pred_class)
+            dataset_base.y[i] = int(pred_class)+1
             newly_labelled_count += 1
             if data_sample.y == true_labels[i]:
                 newly_labelled_correct += 1
@@ -60,7 +60,7 @@ def label_unk(model, dataset: Subset, phase: int, device, protected_indices, pre
         if unlabelling and confidence < threshold and margin < margin_min and i not in protected_indices and data_sample.y != -1:
             if data_sample.y == true_labels[i]:
                 unlabeled_correct += 1
-            data_sample.y = -1
+            dataset_base.y[i] = -1
             unlabeled_count += 1
 
     for i in indices:
@@ -99,19 +99,3 @@ def recreate_datasets(dataset: Subset):
     labeled_dataset = Subset(dataset_base, labeled_indices)
     unlabeled_dataset = Subset(dataset_base, unlabeled_indices)
     return labeled_dataset, unlabeled_dataset
-
-def get_outputs_by_batch(model, dataset, device, batch_size=128):
-    model.eval()
-    loader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
-    output_list = []
-    with torch.no_grad():
-        for batch in loader:
-            if hasattr(batch, 'x'):
-                x = batch.x.to(device)
-            else:
-                x = batch.to(device)
-            outputs = model(x)
-            # outputs: (batch_size, num_classes)
-            for out in outputs:
-                output_list.append(out.cpu())
-    return output_list

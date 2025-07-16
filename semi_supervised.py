@@ -6,15 +6,15 @@ import torch
 from torch import nn
 from data_generator.ntu_data import RAW_DIR, EDGE_INDEX, NTU_Dataset
 from modules.ms_aagcn import ms_aagcn
-from modules.trainer import Trainer
+from modules.trainer_patience import Trainer
 from modules.evaluator import * 
 from modules.utils import *
 import torch.distributed as dist
 import torch.multiprocessing as mp
 from torch.utils.data import random_split, Subset
-# from modules.semi.ralabelling_batch import label_unk, recreate_datasets
-# from modules.semi.relabelling_testing import label_unk, recreate_datasets
-from modules.semi.relabelling import label_unk, recreate_datasets
+from modules.semi.relabelling_batch import label_unk, recreate_datasets
+# from modules.semi.relabelling import label_unk, recreate_datasets
+# from modules.semi.relabelling import label_unk, recreate_datasets
 from collections import OrderedDict
 import random
 import numpy as np
@@ -26,8 +26,8 @@ USE_EXTENDED_DATASET = False # Corresponds to --extended
 MODALITY = "joint"
 BENCHMARK = "xsub"
 ENABLE_PRE_TRANSFORM = False # Corresponds to --pre_transform
-NUM_EPOCHS = 65
-NUM_PHASES = 3
+NUM_EPOCHS = 150
+NUM_PHASES = 10
 BATCH_SIZE = 64
 RANDOM_SEED = 42
 LOADING_PRETRAINED = True # Whether to load a pretrained model for semi-supervised training
@@ -75,7 +75,7 @@ def handle_train_ddp(rank, world_size, proportion):
         extended=USE_EXTENDED_DATASET
     )
 
-    true_labels = [int(total_dataset.y[i]-1) for i in range(len(total_dataset))]
+    true_labels = [int(total_dataset.y[i]) for i in range(len(total_dataset))]
 
     
     dataset, unlabeled_set = splitting_prop(total_dataset, proportion=proportion)
@@ -157,7 +157,8 @@ def handle_train_ddp(rank, world_size, proportion):
                       batch_size=BATCH_SIZE, 
                       rank=rank,
                       world_size=world_size,
-                      device=device
+                      device=device,
+                      patience=12
                       )
 
     try:

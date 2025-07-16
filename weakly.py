@@ -32,11 +32,17 @@ MODALITY = "joint"
 BENCHMARK = "xsub"
 ENABLE_PRE_TRANSFORM = True
 NUM_EPOCHS_PRE_MODEL = 75
-NUM_EPOCHS_MIL_MODEL = 200
-BATCH_SIZE = 32
+NUM_EPOCHS_MIL_MODEL = 300
+BATCH_SIZE = 64
+BATCH_SIZE_MIL = 256
 RANDOM_SEED = 42
+
+MIL_MODEL_HIDDEN_DIM = 512    # Revenir à 512
+LEARNING_RATE_MIL = 0.01    # Revenir à 0.0001 (1e-4)
+DROPOUT_RATE_MIL = 0.3
+
 LOADING_PRETRAINED_PRE_MODEL = True # New hyperparameter for pre_model loading
-LOADING_FEATURES = True  # Whether to load precomputed features if available
+LOADING_FEATURES = True # Whether to load precomputed features if available
 
 
 def set_seed(seed):
@@ -118,7 +124,6 @@ def handle_train_ddp(rank, world_size, proportion):
 
         pre_model = torch.nn.parallel.DistributedDataParallel(pre_model, device_ids=[rank])
         
-        
         should_train_pre_model = False 
     elif not LOADING_FEATURES:
         print(f"Creating new pre_model for semi-supervised training")
@@ -181,16 +186,24 @@ def handle_train_ddp(rank, world_size, proportion):
             feature_dict=feature_dict
         )
 
-        train_loader = PyGDataLoader(train_dataset, batch_size=1, shuffle=True)
-        val_loader = PyGDataLoader(val_dataset, batch_size=1, shuffle=False)
+        train_loader = PyGDataLoader(train_dataset, batch_size=BATCH_SIZE_MIL, shuffle=True)
+        val_loader = PyGDataLoader(val_dataset, batch_size=BATCH_SIZE_MIL, shuffle=False)
 
         example_feat = next(iter(feature_dict.values()))
         input_dim = example_feat.shape[-1]
-        # print("Proportion de bags positifs :", sum(train_bag.bag_labels.values()) / len(train_bag))
-        mil_model = MIL_GCN_Attention(input_dim=input_dim, hidden_dim=256).to(device)
+        print("Proportion de bags positifs (train):", sum(train_bag[1].values()) / len(train_bag[1]))
+        print("Proportion de bags positifs (val):", sum(val_bag[1].values()) / len(val_bag[1]))
+        
+        mil_model = MIL_GCN_Attention(input_dim=input_dim, hidden_dim=MIL_MODEL_HIDDEN_DIM, dropout_rate=DROPOUT_RATE_MIL)
 
-        train_mil_model(mil_model, train_loader, val_loader, device, n_epochs=NUM_EPOCHS_MIL_MODEL)
+        
 
+        mil_log_prefix = f"MIL_{proportion*100:.0f}%" # Garder cette ligne si vous voulez le logging
+        train_mil_model(mil_model, train_loader, val_loader, device, n_epochs=NUM_EPOCHS_MIL_MODEL, lr=LEARNING_RATE_MIL, prefix=mil_log_prefix)
+
+        torch.save(mil_model.state_dict(), "model")
+        mil_model_path = os.path.join("models", f"weakly_mil_model.pt") 
+        print(f"MIL model saved to {mil_model_path}")
         torch.save(mil_model.state_dict(), "model")
         mil_model_path = os.path.join("models", f"weakly_mil_model.pt")
         print(f"MIL model saved to {mil_model_path}")
@@ -207,7 +220,6 @@ def handle_train_main(proportion):
     print(f"Prepare training process on {world_size} GPU")
     mp.spawn(handle_train_ddp, args=(world_size, proportion), nprocs=world_size, join=True)
     
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Multi-streams Attention Adaptive model for Human's Action Recognition")

@@ -23,7 +23,7 @@ USE_EXTENDED_DATASET = False # Corresponds to --extended
 MODALITY = "joint"
 BENCHMARK = "xsub"
 ENABLE_PRE_TRANSFORM = False # Corresponds to --pre_transform
-NUM_EPOCHS = 75
+NUM_EPOCHS = 125
 BATCH_SIZE = 64
 RANDOM_SEED = 42
 
@@ -59,7 +59,7 @@ def handle_train_ddp(rank, world_size, proportion):
     if ENABLE_PRE_TRANSFORM:
         pre_transformer = NTU_Dataset.__nturgbd_pre_transformer__
 
-    dataset = NTU_Dataset(root=DATASET_PATH, 
+    total_dataset = NTU_Dataset(root=DATASET_PATH, 
                           pre_filter=NTU_Dataset.__nturgbd_pre_filter__,
                           pre_transform=pre_transformer,
                           modality=MODALITY, 
@@ -69,7 +69,7 @@ def handle_train_ddp(rank, world_size, proportion):
                           )
 
     # Using a proportion of the dataset
-    dataset, _ = splitting_prop(dataset, proportion=proportion)
+    dataset, _ = splitting_prop(total_dataset, proportion=proportion)
     print(f"Using {proportion*100:.2f}% of the dataset for training.")
     prefix = f"supervised_{proportion*100:.0f}%"
 

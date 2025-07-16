@@ -38,16 +38,16 @@ if __name__ == "__main__":
     if ENABLE_PRE_TRANSFORM:
         pre_transformer = NTU_Dataset.__nturgbd_pre_transformer__
 
-    # total_dataset = NTU_Dataset(
-    #     root=DATASET_PATH, 
-    #     pre_filter=NTU_Dataset.__nturgbd_pre_filter__,
-    #     pre_transform=pre_transformer,
-    #     modality=MODALITY, 
-    #     benchmark=BENCHMARK, 
-    #     part="train",
-    #     extended=USE_EXTENDED_DATASET
-    # )
-    # print(len(total_dataset), "total samples in the dataset\n")
+    total_dataset = NTU_Dataset(
+        root=DATASET_PATH, 
+        pre_filter=NTU_Dataset.__nturgbd_pre_filter__,
+        pre_transform=pre_transformer,
+        modality=MODALITY, 
+        benchmark=BENCHMARK, 
+        part="eval",
+        extended=USE_EXTENDED_DATASET
+    )
+    print(len(total_dataset), "total samples in the dataset\n")
     print(f"Initial labeled data: {(2850 / 40091)*100:.2f}%")
     print(f"{(2138 / 40091)*100:.2f}% of the dataset is labeled\n")
     print(f"total labeled data: {((2850+2138)/40091)*100:.2f} samples")

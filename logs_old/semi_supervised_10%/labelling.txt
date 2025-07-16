@@ -1,0 +1,29 @@
+
+                            60 epochs
+       Phase 1
+percentage of labeled data from the initial unlabeled set: 5.66%
+newly labelled: 97.21% (1985/2042 correct)
+unlabeled: 0.00% (0/0 correctly unlabeled)
+total labeled data: 97.21% (1985/2042 correct)
+
+
+test run du weekend
+
+       Phase 1
+percentage of labeled data from the initial unlabeled set: 6.49%
+newly labelled: 93.60% (2192/2342 correct)
+unlabeled: 0.00% (0/0 correctly unlabeled)
+total labeled data: 93.60% (2192/2342 correct)
+
+       Phase 2
+percentage of labeled data from the initial unlabeled set: 14.84%
+newly labelled: 90.41% (2818/3117 correct)
+unlabeled: 10.58% (11/104 correctly unlabeled)
+total labeled data: 91.82% (4917/5355 correct)
+
+       Phase 3
+percentage of labeled data from the initial unlabeled set: 18.01%
+newly labelled: 88.86% (1157/1302 correct)
+unlabeled: 17.72% (28/158 correctly unlabeled)
+total labeled data: 91.46% (5944/6499 correct)
+

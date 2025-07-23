@@ -5,13 +5,14 @@ import copy
 from typing import List, Dict, Tuple
 
 
-def bag_label_from_instance_labels(instance_labels: List[int]) -> int:
-    return int(any(50 <= x <= 60 for x in instance_labels))
+NON_DAILY_ACTION_CLASSES = list(range(51, 61))
 
+def bag_label_from_instance_labels(instance_labels: List[int]) -> int:
+    return int(any(label in NON_DAILY_ACTION_CLASSES for label in instance_labels))
 
 def data_generation(dataset) -> Tuple[Dict[int, List[int]], Dict[int, int]]:
     instance_index_label = [(i, int(dataset[i].y)) for i in range(len(dataset))]
-    bag_sizes = np.random.randint(3, 7, size=len(instance_index_label)//5)
+    bag_sizes = np.random.randint(5, 15, size=len(instance_index_label)//10)
 
     data_cp = copy.copy(instance_index_label)
     np.random.shuffle(data_cp)
@@ -31,18 +32,14 @@ def data_generation(dataset) -> Tuple[Dict[int, List[int]], Dict[int, int]]:
 
     return bags, bags_labels
 
-
 def create_edge_index(num_nodes: int) -> torch.Tensor:
-    row = []
-    col = []
+    row, col = [], []
     for i in range(num_nodes):
         for j in range(num_nodes):
             if i != j:
                 row.append(i)
                 col.append(j)
-    edge_index = torch.tensor([row, col], dtype=torch.long)
-    return edge_index
-
+    return torch.tensor([row, col], dtype=torch.long)
 
 class BagGraphDataset(Dataset):
     def __init__(self, bags_dict: Dict[int, List[int]],
@@ -61,7 +58,7 @@ class BagGraphDataset(Dataset):
         bag_id = self.bag_ids[idx]
         instance_ids = self.bags_dict[bag_id]
         features = [self.feature_dict[i] for i in instance_ids]
-        x = torch.stack(features)  # [num_nodes, feat_dim]
-        edge_index = create_edge_index(x.size(0))  # [2, num_edges]
+        x = torch.stack(features)
+        edge_index = create_edge_index(x.size(0))
         y = torch.tensor([self.bag_labels_dict[bag_id]], dtype=torch.float)
         return Data(x=x, edge_index=edge_index, y=y)

@@ -7,11 +7,8 @@ from torch.utils.data import DataLoader
 def label_unk(model, dataset: Subset, phase: int, device, protected_indices, prefix=None, true_labels=[]):
     model.eval()
 
-    # threshold = 1 - 0.0005 * 0.30
-    # margin_min = 0.995
     threshold = 0.99
     margin_min = 0.99
-
     unlabelling = True
 
     indices = [i for i in dataset.indices if i not in protected_indices]
@@ -19,24 +16,20 @@ def label_unk(model, dataset: Subset, phase: int, device, protected_indices, pre
 
     newly_labelled_count = 0
     newly_labelled_correct = 0
-
     unlabeled_count = 0
     unlabeled_correct = 0
-
     total_labeled_count = 0
     total_labeled_correct = 0
-    
 
     for i in tqdm(indices, desc=f"[Phase {phase}] Relabelling"):
         data_sample = dataset_base[i]
-        
+
         if hasattr(data_sample, 'x') and torch.is_tensor(data_sample.x):
             sample_tensor = data_sample.x.to(device)
         elif torch.is_tensor(data_sample):
             sample_tensor = data_sample.to(device)
         else:
             raise TypeError("Expected dataset item to be a torch.Tensor or have a .x attribute that is a tensor.")
-
 
         outputs = model(sample_tensor)
         probs = torch.softmax(outputs[0], dim=0)
@@ -47,16 +40,11 @@ def label_unk(model, dataset: Subset, phase: int, device, protected_indices, pre
         pred_class = top2.indices[0].item()
 
         if data_sample.y == -1 and confidence > threshold and margin > margin_min and i not in protected_indices:
-            dataset_base.y[i] = int(pred_class)+1
+            dataset_base.y[i] = int(pred_class) + 1
             newly_labelled_count += 1
             if data_sample.y == true_labels[i]:
                 newly_labelled_correct += 1
-            
-            # log_dir = os.path.join(".", "logs", prefix)
-            # os.makedirs(log_dir, exist_ok=True)
-            # with open(os.path.join(log_dir, "labelling.txt"), "a") as f:
-            #     f.write(f"i={i}, pred={data_sample.y}, pred2={dataset_base.y[i]}, true={true_labels[i]}, match={int(pred_class)==int(true_labels[i])}\n")
-            
+
         if unlabelling and confidence < threshold and margin < margin_min and i not in protected_indices and data_sample.y != -1:
             if data_sample.y == true_labels[i]:
                 unlabeled_correct += 1

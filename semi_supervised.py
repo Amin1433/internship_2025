@@ -13,8 +13,6 @@ import torch.distributed as dist
 import torch.multiprocessing as mp
 from torch.utils.data import random_split, Subset
 from modules.semi.relabelling_batch import label_unk, recreate_datasets
-# from modules.semi.relabelling import label_unk, recreate_datasets
-# from modules.semi.relabelling import label_unk, recreate_datasets
 from collections import OrderedDict
 import random
 import numpy as np
@@ -22,16 +20,16 @@ import numpy as np
 # --- Hyperparameters ---
 
 DATASET_PATH = "data/nturgb+d_skeletons/"
-USE_EXTENDED_DATASET = False # Corresponds to --extended
+USE_EXTENDED_DATASET = False  # Corresponds to --extended
 MODALITY = "joint"
 BENCHMARK = "xsub"
-ENABLE_PRE_TRANSFORM = False # Corresponds to --pre_transform
+ENABLE_PRE_TRANSFORM = False  # Corresponds to --pre_transform
 NUM_EPOCHS = 150
 NUM_PHASES = 10
 BATCH_SIZE = 64
 RANDOM_SEED = 42
-PATIENCE = 12 # Patience for early stopping
-LOADING_PRETRAINED = True # Whether to load a pretrained model for semi-supervised training
+PATIENCE = 12  # Patience for early stopping
+LOADING_PRETRAINED = True  # Whether to load a pretrained model for semi-supervised training
 
 
 def set_seed(seed):
@@ -42,7 +40,7 @@ def set_seed(seed):
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
-# --- Train Parser ---
+# --- Distributed Data Parallel Setup ---
 
 def setup_ddp(rank, world_size):
     os.environ['MASTER_ADDR'] = 'localhost'
@@ -78,14 +76,12 @@ def handle_train_ddp(rank, world_size, proportion):
 
     true_labels = [int(total_dataset.y[i]) for i in range(len(total_dataset))]
 
-    
     dataset, unlabeled_set = splitting_prop(total_dataset, proportion=proportion)
 
-    
     for i in unlabeled_set.indices:
         total_dataset.y[i] = -1
 
-    # Mélange aléatoire des indices
+    # Random shuffle of indices
     total_labeled_indices = dataset.indices 
 
     split_point = int(len(total_labeled_indices) * 0.7)
@@ -100,13 +96,8 @@ def handle_train_ddp(rank, world_size, proportion):
     train_set_indices = train_set_labeled_indices + unlabeled_set.indices
     train_dataset = Subset(total_dataset, train_set_indices)
 
-
-
-
     print(f"Using {proportion*100:.2f}% of the dataset labeled.")
     prefix = f"semi_supervised_{proportion*100:.0f}%"
-
-
 
     if rank == 0:
         print(f"Training model on {os.path.basename(DATASET_PATH.rstrip('/'))} dataset...")
@@ -119,7 +110,7 @@ def handle_train_ddp(rank, world_size, proportion):
     
     if LOADING_PRETRAINED:
         print(f"[INFO] Loading pretrained model for semi-supervised training with {proportion*100:.0f}% labeled data")
-        # ----------- Load pretrained supervised model -----------
+        # Load pretrained supervised model
         supervised_model_path = os.path.join("models", f"supervised_{proportion*100:.0f}%.pt")
         print(f"[INFO] Loading pretrained model: {supervised_model_path}")
         model = ms_aagcn(num_class=num_classes).to(rank)
@@ -142,9 +133,8 @@ def handle_train_ddp(rank, world_size, proportion):
                 else:
                     print(f"[WARNING] {src_file} not found. Skipping.")
 
-        # ----------- Create model -----------
     else:
-        print(f"[INFO] Creating new model for semi-supervised trainning")
+        print(f"[INFO] Creating new model for semi-supervised training")
         model = ms_aagcn(num_class=num_classes).to(rank)
         model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[rank])
         starting_phase = 1
@@ -179,7 +169,7 @@ def handle_train_ddp(rank, world_size, proportion):
 
             print(f"Updated train dataset (phase {1}): {len(train_set)} labeled samples, {len(unlabeled_set)} unlabeled samples, {len(train_dataset)} total samples")
 
-        for phase in range(starting_phase,NUM_PHASES+1):
+        for phase in range(starting_phase, NUM_PHASES+1):
             print(f"\nPhase {phase}/{NUM_PHASES}")
 
             history = trainer.train(train_set, val_set, NUM_EPOCHS, prefix=prefix + f"/phase{phase}")
@@ -204,19 +194,15 @@ def handle_train_ddp(rank, world_size, proportion):
         
         end_time = time.time()
 
-
         if rank == 0:
             print(f"Training time {end_time - start_time:.2f} seconds", file=sys.stderr)
-            
-            # model_path = os.path.join("models", f"{prefix}.pt")
-            # save_model(model_path, model, optimizer, loss_function, history, BATCH_SIZE)
 
     finally:
         cleanup_ddp()
 
 def handle_train_parser(proportion):
     world_size = torch.cuda.device_count()
-    print(f"Prepare training process on {world_size} GPU")
+    print(f"Preparing training process on {world_size} GPUs")
     mp.spawn(handle_train_ddp, args=(world_size, proportion), nprocs=world_size, join=True)
 
 
@@ -224,19 +210,12 @@ def handle_train_parser(proportion):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Multi-streams Attention Adaptive model for Human's Action Recognition")
-    parser.add_argument("--disable-cuda", action="store_true", help="disable CUDA")
-    
+    parser.add_argument("--disable-cuda", action="store_true", help="Disable CUDA")
     parser.add_argument("--proportion", type=float, default=0.01, help="Proportion of the dataset to use for training (0.0 to 1.0)")
-
 
     args = parser.parse_args()
 
     if args.disable_cuda:
         device = torch.device('cpu')
-    """
-    else:
-        device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device('cpu')
-    """
-    
 
     handle_train_parser(args.proportion)

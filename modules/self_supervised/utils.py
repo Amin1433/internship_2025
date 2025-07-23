@@ -22,7 +22,6 @@ def ssl_load_model(model_path: str, model_tower_instance, optimizer_instance, lo
 
     model_tower_state_dict = parameters['model_tower_state_dict']
     
-    # Remove 'module.' prefix if it exists (from DDP saving)
     new_state_dict = OrderedDict()
     for k, v in model_tower_state_dict.items():
         name = k[7:] if k.startswith('module.') else k
@@ -30,9 +29,6 @@ def ssl_load_model(model_path: str, model_tower_instance, optimizer_instance, lo
 
     model_tower_instance.load_state_dict(new_state_dict)
     optimizer_instance.load_state_dict(parameters['optimizer_state_dict'])
-    # loss_function is usually stateless, so we just return the instance provided or a placeholder
-    # If loss_function requires state, it should be handled differently or passed as an initialized object.
-
     history = parameters.get('history', {})
     batch_size = parameters.get('batch_size', None)
 

@@ -19,11 +19,7 @@ import numpy as np
 from modules.MIL.MILBagDataset import *
 from modules.MIL.GraphMIL import *
 from modules.MIL.utils import *
-from torch.utils.data import DataLoader
 from torch_geometric.loader import DataLoader as PyGDataLoader
-from typing import List, Dict
-from modules.utils import load_model, save_model
-
 
 # --- Hyperparameters ---
 DATASET_PATH = "data/nturgb+d_skeletons/"
@@ -34,16 +30,13 @@ ENABLE_PRE_TRANSFORM = True
 NUM_EPOCHS_PRE_MODEL = 75
 NUM_EPOCHS_MIL_MODEL = 300
 BATCH_SIZE = 64
-BATCH_SIZE_MIL = 256
+BATCH_SIZE_MIL = 128
 RANDOM_SEED = 42
-
-MIL_MODEL_HIDDEN_DIM = 512    # Revenir à 512
-LEARNING_RATE_MIL = 0.01    # Revenir à 0.0001 (1e-4)
-DROPOUT_RATE_MIL = 0.3
-
-LOADING_PRETRAINED_PRE_MODEL = True # New hyperparameter for pre_model loading
-LOADING_FEATURES = True # Whether to load precomputed features if available
-
+MIL_MODEL_HIDDEN_DIM = 512
+LEARNING_RATE_MIL = 5e-5
+DROPOUT_RATE_MIL = 0.7
+LOADING_PRETRAINED_PRE_MODEL = True
+LOADING_FEATURES = False
 
 def set_seed(seed):
     random.seed(seed)
@@ -53,11 +46,9 @@ def set_seed(seed):
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
-
 def setup_ddp(rank, world_size):
     os.environ['MASTER_ADDR'] = 'localhost'
     os.environ['MASTER_PORT'] = '9999'
-
     dist.init_process_group("nccl", init_method='env://', rank=rank, world_size=world_size)
 
 def cleanup_ddp():
@@ -70,10 +61,7 @@ def handle_train_ddp(rank, world_size, proportion):
     set_seed(RANDOM_SEED + rank)
     device = torch.device(f'cuda:{rank}')
 
-    pre_transformer = None
-    if ENABLE_PRE_TRANSFORM:
-        pre_transformer = NTU_Dataset.__nturgbd_pre_transformer__
-
+    pre_transformer = NTU_Dataset.__nturgbd_pre_transformer__ if ENABLE_PRE_TRANSFORM else None
     dataset = NTU_Dataset(
         root=DATASET_PATH,
         pre_filter=NTU_Dataset.__nturgbd_pre_filter__,
@@ -83,159 +71,82 @@ def handle_train_ddp(rank, world_size, proportion):
         part="train",
         extended=USE_EXTENDED_DATASET
     )
-    print(f"Dataset size: {len(dataset)}")
-
-    dataset1, dataset2 = splitting_prop(dataset, proportion)
     
-    total_labeled_indices = dataset1.indices 
-    split_point = int(len(total_labeled_indices) * 0.7)
-    train_set_labeled_indices = total_labeled_indices[:split_point]
-    val_set_indices = total_labeled_indices[split_point:]
-    train_set1 = Subset(dataset, train_set_labeled_indices)
-    val_set1 = Subset(dataset, val_set_indices)
-
+    # Split dataset into labeled and unlabeled subsets
+    dataset1, dataset2 = splitting_prop(dataset, proportion)
+    train_set1, val_set1 = splitting_prop(dataset1, 0.7)
     train_set2, val_set2 = splitting_prop(dataset2, 0.7)
 
-    print(f"Train set size: {len(train_set1)}, Validation set size: {len(val_set1)}")
+    num_classes = 60
+    pre_model_path = os.path.join("models", f"supervised_{proportion*100:.0f}%.pt")
+    pre_model = ms_aagcn(num_class=num_classes).to(device)
 
-    num_classes = 120 if USE_EXTENDED_DATASET else 60
-
-    # --- Pre-model loading/creation logic ---
     if LOADING_PRETRAINED_PRE_MODEL:
-        print(f"Loading pretrained pre_model for semi-supervised training")
-        pre_model_path = os.path.join("models", f"supervised_{proportion*100:.0f}%.pt")
-        print(f"Loading pretrained pre_model from: {pre_model_path}")
-        
-        pre_model = ms_aagcn(num_class=num_classes).to(rank)
-        
-        # Load the state_dict, optimizer, loss_function, etc. from the saved file
         try:
-            model_sd, optimizer_sd, loss_function_sd, history_sd, batch_size_sd = load_model(pre_model_path)
-            # Clean state_dict keys if saved from a DDP wrapped model ("module." prefix)
+            model_sd, _, _, _, _ = load_model(pre_model_path)
+            # Remove 'module.' prefix if saved from DDP
             cleaned_sd = OrderedDict((k.replace("module.", ""), v) for k, v in model_sd.items())
             pre_model.load_state_dict(cleaned_sd, strict=False)
-            print("Pre-model loaded successfully.")
         except FileNotFoundError:
-            print(f"Error: Pre-trained model not found at {pre_model_path}. Exiting.")
-            sys.exit(1)
-        except Exception as e:
-            print(f"Error loading pre-trained model: {e}. Exiting.")
+            if rank == 0:
+                print(f"ERROR: Pre-trained model not found at {pre_model_path}. Exiting.", file=sys.stderr)
             sys.exit(1)
 
-        pre_model = torch.nn.parallel.DistributedDataParallel(pre_model, device_ids=[rank])
-        
-        should_train_pre_model = False 
-    elif not LOADING_FEATURES:
-        print(f"Creating new pre_model for semi-supervised training")
-        pre_model = ms_aagcn(num_class=num_classes).to(rank)
-        pre_model = torch.nn.parallel.DistributedDataParallel(pre_model, device_ids=[rank])
-        should_train_pre_model = True 
-
-    loss_function = nn.CrossEntropyLoss()
-    optimizer = torch.optim.SGD(pre_model.parameters(), lr=0.01, nesterov=True, momentum=0.9, weight_decay=0.0001)
-
-    trainer = Trainer(model=pre_model,
-                      optimizer=optimizer,
-                      loss_function=loss_function,
-                      batch_size=BATCH_SIZE,
-                      rank=rank,
-                      world_size=world_size,
-                      device=device
-                      )
-
-    try:
-        if should_train_pre_model:
-            start_time = time.time()
-            history = trainer.train(train_set1, val_set1, NUM_EPOCHS_PRE_MODEL)
-            end_time = time.time()
-
-            if rank == 0:
-                print(f"Training time {end_time - start_time:.2f} seconds", file=sys.stderr)
-                pre_model_path = os.path.join("models", f"weakly_premodel_{proportion*100:.0f}.pt")
-                save_model(pre_model_path, pre_model, optimizer, loss_function, history, BATCH_SIZE)
-        else:
-            if rank == 0:
-                print("Skipping pre-model training as it was loaded from pretrained.")
-
-
+    pre_model = torch.nn.parallel.DistributedDataParallel(pre_model, device_ids=[rank])
+    
+    if rank == 0:
         print("Generating bags from dataset...")
-        train_bag = data_generation(train_set2)
-        val_bag = data_generation(val_set2)
 
-        features_path = os.path.join("models/features", f"features_{proportion*100:.0f}.pkl")
-        if LOADING_FEATURES:
-            if os.path.exists(features_path):
-                with open(features_path, "rb") as f:
-                    feature_dict = pickle.load(f)
-                print(f"Loaded features from {features_path}")
-        else:
-            feature_dict = extract_features(pre_model, dataset2, device)
-            os.makedirs(os.path.dirname(features_path), exist_ok=True)
-            with open(features_path, "wb") as f:
-                pickle.dump(feature_dict, f)
-            print(f"Features saved to {features_path}")
+    train_bag = data_generation(train_set2)
+    val_bag = data_generation(val_set2)
 
-        train_dataset = BagGraphDataset(
-            bags_dict=train_bag[0],
-            bag_labels_dict=train_bag[1],
-            feature_dict=feature_dict
-        )
-        val_dataset = BagGraphDataset(
-            bags_dict=val_bag[0],
-            bag_labels_dict=val_bag[1],
-            feature_dict=feature_dict
-        )
+    if rank == 0:
+        train_total_bags = len(train_bag[1])
+        if train_total_bags > 0:
+            train_positive_bags = sum(train_bag[1].values())
+            print(f"Train Bags: {train_positive_bags}/{train_total_bags} positives ({train_positive_bags/train_total_bags:.2%})")
 
-        train_loader = PyGDataLoader(train_dataset, batch_size=BATCH_SIZE_MIL, shuffle=True)
-        val_loader = PyGDataLoader(val_dataset, batch_size=BATCH_SIZE_MIL, shuffle=False)
+        val_total_bags = len(val_bag[1])
+        if val_total_bags > 0:
+            val_positive_bags = sum(val_bag[1].values())
+            print(f"Val Bags:   {val_positive_bags}/{val_total_bags} positives ({val_positive_bags/val_total_bags:.2%})")
 
-        example_feat = next(iter(feature_dict.values()))
-        input_dim = example_feat.shape[-1]
-        print("Proportion de bags positifs (train):", sum(train_bag[1].values()) / len(train_bag[1]))
-        print("Proportion de bags positifs (val):", sum(val_bag[1].values()) / len(val_bag[1]))
-        
-        mil_model = MIL_GCN_Attention(input_dim=input_dim, hidden_dim=MIL_MODEL_HIDDEN_DIM, dropout_rate=DROPOUT_RATE_MIL)
+    features_path = os.path.join("models/features", f"features_{proportion*100:.0f}.pkl")
+    if LOADING_FEATURES and os.path.exists(features_path):
+        with open(features_path, "rb") as f:
+            feature_dict = pickle.load(f)
+    else:
+        feature_dict = extract_features(pre_model, dataset2, device)
+        os.makedirs(os.path.dirname(features_path), exist_ok=True)
+        with open(features_path, "wb") as f:
+            pickle.dump(feature_dict, f)
 
-        
+    train_dataset = BagGraphDataset(train_bag[0], train_bag[1], feature_dict)
+    val_dataset = BagGraphDataset(val_bag[0], val_bag[1], feature_dict)
+    train_loader = PyGDataLoader(train_dataset, batch_size=BATCH_SIZE_MIL, shuffle=True)
+    val_loader = PyGDataLoader(val_dataset, batch_size=BATCH_SIZE_MIL, shuffle=False)
 
-        mil_log_prefix = f"MIL_{proportion*100:.0f}%" # Garder cette ligne si vous voulez le logging
-        train_mil_model(mil_model, train_loader, val_loader, device, n_epochs=NUM_EPOCHS_MIL_MODEL, lr=LEARNING_RATE_MIL, prefix=mil_log_prefix)
+    input_dim = next(iter(feature_dict.values())).shape[-1]
+    mil_model = MIL_GCN_Attention(input_dim=input_dim, hidden_dim=MIL_MODEL_HIDDEN_DIM, dropout_rate=DROPOUT_RATE_MIL).to(device)
+    
+    mil_log_prefix = f"MIL_{proportion*100:.0f}%"
+    train_mil_model(mil_model, train_loader, val_loader, device, n_epochs=NUM_EPOCHS_MIL_MODEL, lr=LEARNING_RATE_MIL, prefix=mil_log_prefix)
 
-        torch.save(mil_model.state_dict(), "model")
-        mil_model_path = os.path.join("models", f"weakly_mil_model.pt") 
-        print(f"MIL model saved to {mil_model_path}")
-        torch.save(mil_model.state_dict(), "model")
-        mil_model_path = os.path.join("models", f"weakly_mil_model.pt")
+    if rank == 0:
+        mil_model_path = os.path.join("models", f"weakly_mil_model_{proportion*100:.0f}.pt")
+        torch.save(mil_model.state_dict(), mil_model_path)
         print(f"MIL model saved to {mil_model_path}")
 
-    finally:
-        cleanup_ddp()
-
+    cleanup_ddp()
 
 def handle_train_main(proportion):
     world_size = torch.cuda.device_count()
     if world_size == 0:
-        print("No CUDA devices found. This script is configured for DDP on GPU.", file=sys.stderr)
-        sys.exit(1)
-    print(f"Prepare training process on {world_size} GPU")
+        sys.exit("No CUDA devices found. This script requires GPUs for DistributedDataParallel.")
     mp.spawn(handle_train_ddp, args=(world_size, proportion), nprocs=world_size, join=True)
-    
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Multi-streams Attention Adaptive model for Human's Action Recognition")
-    parser.add_argument("--disable-cuda", action="store_true", help="disable CUDA")
-    
-    parser.add_argument("--proportion", type=float, default=0.1, help="Proportion of the dataset to use for training (0.0 to 1.0)")
-
-
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--proportion", type=float, default=0.1, help="Proportion of the dataset to use for supervision.")
     args = parser.parse_args()
-
-    if args.disable_cuda:
-        device = torch.device('cpu')
-    """
-    else:
-        device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device('cpu')
-    """
-    
-
     handle_train_main(args.proportion)

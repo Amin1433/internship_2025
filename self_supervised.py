@@ -1,4 +1,3 @@
-# Fichier: self_supervised.py
 
 import argparse
 import os
@@ -135,7 +134,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Downstream Fine-tuning from auto-detected SSL weights")
     parser.add_argument("--proportion", type=float, required=True, help="Proportion of labeled data. Ex: 0.1")
     parser.add_argument("--freeze-encoder", action="store_true", help="Freeze encoder weights.")
-    # Ajout d'un argument rank pour la condition d'affichage
+
     parser.add_argument('--rank', default=0, type=int, help='node rank for distributed training')
     args = parser.parse_args()
     handle_train_parser(args)

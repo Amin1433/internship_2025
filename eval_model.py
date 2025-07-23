@@ -71,8 +71,8 @@ def main():
         log_base_name = re.sub(r'_phase_\d+$', '', model_name) 
         log_dir = f"logs/{log_base_name}" 
     else:
-        model_path = f"models/{model_name}%.pt" 
-        log_dir = f"logs/{model_name}%"
+        model_path = f"models/{model_name}.pt" 
+        log_dir = f"logs/{model_name}"
     os.makedirs(log_dir, exist_ok=True)
     log_file = os.path.join(log_dir, "evaluation.txt")
 
@@ -80,8 +80,8 @@ def main():
         print(f"Model not found: {model_path}")
         sys.exit(1)
 
-    with open(log_file, 'w') as f:
-        f.write(f"Evaluation of model: {model_name}\n")
+    with open(log_file, 'a') as f:
+        f.write(f"\nEvaluation of model: {model_name}\n")
 
     for split in ['train', 'eval']:
         evaluate_split(split, model_name, model_path, log_file)

@@ -36,3 +36,5 @@ torch_geometric/data/.cache/
 data/nturgb+d_skeletons/
 models/
 models_old/
+logs_old/
+history/

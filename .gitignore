@@ -35,3 +35,4 @@ torch_geometric/data/.cache/
 # Dataset
 data/nturgb+d_skeletons/
 models/
+models_old/

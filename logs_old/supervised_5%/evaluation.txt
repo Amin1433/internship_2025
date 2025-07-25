@@ -1,5 +1,0 @@
-Evaluation of model: supervised_5
-[TRAIN] Top-1 Accuracy: 38.48%
-[TRAIN] Top-5 Accuracy: 72.69%
-[EVAL] Top-1 Accuracy: 34.31%
-[EVAL] Top-5 Accuracy: 68.65%

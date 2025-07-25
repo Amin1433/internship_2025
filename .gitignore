@@ -32,7 +32,6 @@ torch_geometric/data/.cache/
 # Jupyter Notebook checkpoints
 .ipynb_checkpoints/
 
-# Dataset
 data/nturgb+d_skeletons/
 models/
 models_old/

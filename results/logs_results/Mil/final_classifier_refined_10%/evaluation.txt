@@ -1,0 +1,14 @@
+
+Evaluation of model: final_classifier_refined
+
+Evaluation of model: final_classifier_refined
+[TRAIN] Top-1 Accuracy: 1.66%
+[TRAIN] Top-5 Accuracy: 9.06%
+[EVAL] Top-1 Accuracy: 1.66%
+[EVAL] Top-5 Accuracy: 8.26%
+
+Evaluation of model: final_classifier_refined
+[TRAIN] Top-1 Accuracy: 2.19%
+[TRAIN] Top-5 Accuracy: 8.44%
+[EVAL] Top-1 Accuracy: 1.70%
+[EVAL] Top-5 Accuracy: 8.42%

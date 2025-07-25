@@ -1,0 +1,5 @@
+Evaluation of model: downstream_p1_frozen_final_model
+[TRAIN] Top-1 Accuracy: 7.26%
+[TRAIN] Top-5 Accuracy: 29.83%
+[EVAL] Top-1 Accuracy: 6.95%
+[EVAL] Top-5 Accuracy: 28.63%

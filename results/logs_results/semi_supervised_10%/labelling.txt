@@ -1,0 +1,153 @@
+
+
+patience train 
+
+        Phase 1
+percentage of labeled data from the initial unlabeled set: 19.91%
+newly labelled: 88.40% (6350/7183 correct)
+unlabeled: 0.00% (0/0 correctly unlabeled)
+total labeled data: 88.40% (6350/7183 correct)
+
+        Phase 2
+percentage of labeled data from the initial unlabeled set: 29.52%
+newly labelled: 77.21% (3015/3905 correct)
+unlabeled: 30.66% (134/437 correctly unlabeled)
+total labeled data: 85.08% (9062/10651 correct)
+
+patience eval
+
+        Phase 1
+percentage of labeled data from the initial unlabeled set: 9.64%
+newly labelled: 93.76% (3261/3478 correct)
+unlabeled: 0.00% (0/0 correctly unlabeled)
+total labeled data: 93.76% (3261/3478 correct)
+
+        Phase 1
+percentage of labeled data from the initial unlabeled set: 9.64%
+newly labelled: 93.76% (3261/3478 correct)
+unlabeled: 0.00% (0/0 correctly unlabeled)
+total labeled data: 93.76% (3261/3478 correct)
+
+        Phase 2
+percentage of labeled data from the initial unlabeled set: 16.41%
+newly labelled: 84.73% (2603/3072 correct)
+unlabeled: 15.76% (99/628 correctly unlabeled)
+total labeled data: 90.09% (5335/5922 correct)
+
+        Phase 3
+percentage of labeled data from the initial unlabeled set: 22.55%
+newly labelled: 79.38% (2344/2953 correct)
+unlabeled: 24.56% (181/737 correctly unlabeled)
+total labeled data: 87.53% (7123/8138 correct)
+
+        Phase 4
+percentage of labeled data from the initial unlabeled set: 30.54%
+newly labelled: 78.01% (2583/3311 correct)
+unlabeled: 31.16% (134/430 correctly unlabeled)
+total labeled data: 85.40% (9410/11019 correct)
+
+        Phase 5
+percentage of labeled data from the initial unlabeled set: 34.59%
+newly labelled: 63.75% (2365/3710 correct)
+unlabeled: 26.23% (590/2249 correctly unlabeled)
+total labeled data: 81.06% (10116/12480 correct)
+
+        Phase 6
+percentage of labeled data from the initial unlabeled set: 40.09%
+newly labelled: 69.44% (1881/2709 correct)
+unlabeled: 48.48% (350/722 correctly unlabeled)
+total labeled data: 80.36% (11625/14467 correct)
+
+        Phase 7
+percentage of labeled data from the initial unlabeled set: 43.18%
+newly labelled: 62.20% (1106/1778 correct)
+unlabeled: 34.74% (231/665 correctly unlabeled)
+total labeled data: 78.93% (12297/15580 correct)
+
+        Phase 8
+percentage of labeled data from the initial unlabeled set: 45.75%
+newly labelled: 54.99% (1147/2086 correct)
+unlabeled: 38.91% (451/1159 correctly unlabeled)
+total labeled data: 77.16% (12736/16507 correct)
+
+        Phase 9
+percentage of labeled data from the initial unlabeled set: 48.08%
+newly labelled: 64.72% (1255/1939 correct)
+unlabeled: 49.14% (540/1099 correctly unlabeled)
+total labeled data: 77.43% (13432/17347 correct)
+
+        Phase 10
+percentage of labeled data from the initial unlabeled set: 45.87%
+newly labelled: 60.00% (894/1490 correct)
+unlabeled: 45.36% (1037/2286 correctly unlabeled)
+total labeled data: 79.01% (13077/16551 correct)
+
+        Phase 11
+percentage of labeled data from the initial unlabeled set: 49.97%
+newly labelled: 55.76% (1249/2240 correct)
+unlabeled: 38.16% (290/760 correctly unlabeled)
+total labeled data: 76.85% (13856/18031 correct)
+
+        Phase 12
+percentage of labeled data from the initial unlabeled set: 50.23%
+newly labelled: 61.53% (1177/1913 correct)
+unlabeled: 45.96% (836/1819 correctly unlabeled)
+total labeled data: 77.52% (14050/18125 correct)
+
+        Phase 13
+percentage of labeled data from the initial unlabeled set: 51.40%
+newly labelled: 58.52% (1023/1748 correct)
+unlabeled: 35.72% (474/1327 correctly unlabeled)
+total labeled data: 76.67% (14220/18546 correct)
+
+        Phase 14
+percentage of labeled data from the initial unlabeled set: 54.04%
+newly labelled: 62.21% (1159/1863 correct)
+unlabeled: 45.66% (416/911 correctly unlabeled)
+total labeled data: 76.34% (14884/19498 correct)
+
+        Phase 15
+percentage of labeled data from the initial unlabeled set: 56.27%
+newly labelled: 59.51% (1029/1729 correct)
+unlabeled: 43.34% (400/923 correctly unlabeled)
+total labeled data: 75.80% (15390/20304 correct)
+
+        Phase 16
+percentage of labeled data from the initial unlabeled set: 55.39%
+newly labelled: 57.81% (770/1332 correct)
+unlabeled: 43.88% (724/1650 correctly unlabeled)
+total labeled data: 76.22% (15234/19986 correct)
+
+        Phase 17
+percentage of labeled data from the initial unlabeled set: 50.11%
+newly labelled: 50.90% (964/1894 correct)
+unlabeled: 38.58% (1466/3800 correctly unlabeled)
+total labeled data: 76.68% (13864/18080 correct)
+
+        Phase 18
+percentage of labeled data from the initial unlabeled set: 56.84%
+newly labelled: 64.54% (1840/2851 correct)
+unlabeled: 49.65% (210/423 correctly unlabeled)
+total labeled data: 75.54% (15491/20508 correct)
+
+        Phase 19
+percentage of labeled data from the initial unlabeled set: 55.55%
+newly labelled: 58.92% (773/1312 correct)
+unlabeled: 45.92% (815/1775 correctly unlabeled)
+total labeled data: 76.35% (15304/20045 correct)
+
+        Phase 20
+percentage of labeled data from the initial unlabeled set: 58.60%
+newly labelled: 59.71% (1073/1797 correct)
+unlabeled: 43.63% (305/699 correctly unlabeled)
+total labeled data: 75.59% (15983/21143 correct)
+
+
+testing more
+
+        Phase 20 seconde
+percentage of labeled data from the initial unlabeled set: 52.64%
+newly labelled: 77.12% (14648/18993 correct)
+unlabeled: 0.00% (0/0 correctly unlabeled)
+total labeled data: 77.12% (14648/18993 correct)
+

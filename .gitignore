@@ -37,4 +37,6 @@ data/nturgb+d_skeletons/
 models/
 models_old/
 logs_old/
+logs/
+graphs/
 history/

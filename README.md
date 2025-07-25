@@ -94,4 +94,4 @@ Simply run the script from the root directory of the project. No arguments are n
 
 ```bash
 python plot.py
-'''
+

@@ -72,3 +72,26 @@ The save model **should** be in the /models directory.
 # Usage: python eval_model.py <model_file_name>
 python eval_model.py "supervised_10.pt"
 ```
+
+## Plotting Results
+
+The project includes a `plot.py` script to automatically generate and save training and validation curves for all completed experiments.
+
+The script scans the `logs/` directory. For each sub-directory (e.g., `supervised_p10`, `self_supervised_p10_frozen`), it looks for the `.npy` files containing the training history (`train_loss.npy`, `val_loss.npy`, `train_acc.npy`, `val_acc.npy`).
+
+It then generates two plots:
+-   **Loss Curve** (`loss_curve.png`)
+-   **Accuracy Curve** (`accuracy_curve.png`)
+
+These plots are saved in a newly created `graphs/` directory, mirroring the structure of your `logs/` directory.
+
+### Special Handling for Semi-Supervised
+For experiments starting with `semi_supervised`, the script will first look for `phase1`, `phase2`, etc., sub-directories. It will automatically concatenate the `.npy` files from each phase into a single continuous history and draw vertical lines on the plots to mark the boundaries between phases.
+
+### Usage
+
+Simply run the script from the root directory of the project. No arguments are needed.
+
+```bash
+python plot.py
+'''
